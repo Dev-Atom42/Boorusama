@@ -103,7 +103,7 @@ class BackgroundDownloader implements DownloadService {
   }
 
   String _sanitizeFilename(String filename) {
-    return filename.replaceAll('/', '_');
+    return filename.replaceAll(RegExp(r'[<>:"|?\*]'), '_');
   }
 
   Future<DownloadResult> _executeDownload({
@@ -116,20 +116,30 @@ class BackgroundDownloader implements DownloadService {
         targetDir: targetDir,
         options: options,
       );
-
       if (cacheResult case final result?) {
         return result;
       }
 
+      final sanitizedFilename = _sanitizeFilename(options.filename);
+      final pathParts = sanitizedFilename.split('/');
+      final actualFilename = pathParts.last;
+      final subDirs = pathParts.sublist(0, pathParts.length - 1);
+    
+      String finalDirectory = targetDir ?? '';
+      if (subDirs.isNotEmpty) {
+        final subDirPath = subDirs.join('/');
+        finalDirectory = finalDirectory.isEmpty 
+            ? subDirPath 
+            : '$finalDirectory/$subDirPath';
+      }
+  
       final task = DownloadTask(
         url: options.url,
-        filename: _sanitizeFilename(
-          options.filename,
-        ),
+        filename: actualFilename,
         allowPause: true,
         retries: 1,
         baseDirectory: baseDirectory,
-        directory: targetDir ?? '',
+        directory: finalDirectory,
         updates: Updates.statusAndProgress,
         metaData: options.metadata?.toJsonString() ?? '',
         headers: options.headers,
@@ -137,7 +147,7 @@ class BackgroundDownloader implements DownloadService {
       );
 
       _log(
-        'Starting download: ${options.url} to $targetDir/${options.filename}',
+        'Starting download: ${options.url} to $finalDirectory/$actualFilename',
       );
 
       return FileDownloader().enqueueIfNeeded(
@@ -250,6 +260,29 @@ class BackgroundDownloader implements DownloadService {
     }
 
     final targetPath = join(targetDir, filename);
+
+    final targetFileDir = dirname(targetPath);
+    if (!fs.directoryExistsSync(targetFileDir)) {
+      await fs.createDirectory(targetFileDir, recursive: true);
+    }
+
+    if ((skipIfExists ?? false) && fs.fileExistsSync(targetPath)) {
+      return DownloadSkipped(
+        DownloadTaskInfo(
+          path: targetPath,
+          id: 'existing_${DateTime.now().millisecondsSinceEpoch}',
+        ),
+      );
+    }
+
+    await fs.copyFile(cachedPath, targetPath);
+    return DownloadCompleted(
+      DownloadTaskInfo(
+        path: targetPath,
+        id: 'cached_${DateTime.now().millisecondsSinceEpoch}',
+      ),
+      source: DownloadCompletionSource.cache,
+    );
 
     // Check if target file already exists
     if ((skipIfExists ?? false) && fs.fileExistsSync(targetPath)) {
