@@ -1,6 +1,9 @@
 name: GitHub release
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       release_tag:
@@ -35,9 +38,8 @@ concurrency:
 
 jobs:
   preflight:
-    if: github.actor == 'khoadng'
     name: Validate shared toolchain
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       BOORUSAMA_USE_FVM: "false"
@@ -45,14 +47,12 @@ jobs:
       - name: Check out Boorusama
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.release_tag }}
-
+          ref: ${{ inputs.release_tag || github.ref }}
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version-file: .fvmrc
           cache: true
-
       - name: Validate Flutter and Dart dependencies
         shell: bash
         run: |
@@ -62,7 +62,6 @@ jobs:
           flutter pub get --enforce-lockfile
 
   build:
-    if: github.actor == 'khoadng'
     needs: preflight
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
@@ -70,36 +69,30 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.windows_only && !inputs.smoke_run &&
-          '[{"target":"windows-zip","os":"windows-latest","artifact_name":"boorusama-windows-zip"}]' ||
-          '[{"target":"apk","os":"ubuntu-latest","artifact_name":"boorusama-apk"},
-            {"target":"linux-tar.gz","os":"ubuntu-latest","artifact_name":"boorusama-linux-tar-gz"},
-            {"target":"appimage","os":"ubuntu-latest","artifact_name":"boorusama-appimage"},
-            {"target":"windows-zip","os":"windows-latest","artifact_name":"boorusama-windows-zip"},
-            {"target":"ipa","os":"macos-latest","artifact_name":"boorusama-ipa"},
-            {"target":"dmg","os":"macos-latest","artifact_name":"boorusama-dmg"}]') }}
-
+        include:
+          - target: apk
+            os: ubuntu-24.04
+            artifact_name: boorusama-apk
+          - target: linux-tar.gz
+            os: ubuntu-24.04
+            artifact_name: boorusama-linux-tar-gz
+          - target: appimage
+            os: ubuntu-24.04
+            artifact_name: boorusama-appimage
     env:
       BOORUSAMA_USE_FVM: "false"
       OUTPUT_DIR: release-artifacts/${{ matrix.target }}
-
     steps:
       - name: Check out Boorusama
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.release_tag }}
+          ref: ${{ inputs.release_tag || github.ref }}
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version-file: .fvmrc
           cache: true
-
-      - name: Set up Xcode
-        if: runner.os == 'macOS'
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
 
       - name: Set up Android SDK
         if: matrix.target == 'apk'
@@ -113,8 +106,10 @@ jobs:
         working-directory: packages/boorusama_cli
         run: dart run boorusama_cli:boorusama setup android-sdk --ci
 
-      # Without key.properties Gradle silently signs with a throwaway debug key,
-      # so published APKs could not update each other.
+      # Without key.properties Gradle falls back to the keystore committed at
+      # android/keystore/debug.jks. That key is stable between CI runs, so APKs
+      # from this workflow can still update each other. Only require the
+      # release secrets when at least one of them is configured.
       - name: Configure Android release signing
         if: matrix.target == 'apk' && !inputs.smoke_run
         shell: bash
@@ -125,12 +120,22 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
+          missing=()
           for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
             if [[ -z "${!name}" ]]; then
-              echo "::error::Missing Android signing secret for $name"
-              exit 1
+              missing+=("$name")
             fi
           done
+          if [[ ${#missing[@]} -eq 4 ]]; then
+            echo "::warning::Android signing secrets are not configured; signing the APK with the committed debug keystore (android/keystore/debug.jks)."
+            exit 0
+          fi
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            for name in "${missing[@]}"; do
+              echo "::error::Missing Android signing secret for $name"
+            done
+            exit 1
+          fi
           keystore="$RUNNER_TEMP/release.jks"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
           {
@@ -140,6 +145,15 @@ jobs:
             echo "keyPassword=$KEY_PASSWORD"
           } > android/key.properties
 
+      - name: Force baseline x86-64 ISA for Linux artifacts
+        if: matrix.target != 'apk'
+        shell: bash
+        run: |
+          {
+            echo "CFLAGS=-march=x86-64"
+            echo "CXXFLAGS=-march=x86-64"
+          } >> "$GITHUB_ENV"
+
       - name: Install Linux native build tools
         if: runner.os == 'Linux'
         shell: bash
@@ -148,19 +162,44 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y meson ninja-build nasm
 
-      - name: Install Linux desktop dependencies
-        if: matrix.target == 'linux-tar.gz' || matrix.target == 'appimage'
+      - name: Install system dependencies
+        if: runner.os == 'Linux' && matrix.target != 'apk'
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y \
-            clang \
+            build-essential \
             cmake \
+            ninja-build \
+            meson \
+            nasm \
+            yasm \
+            pkg-config \
+            python3 \
+            git \
+            unzip \
             libgtk-3-dev \
             liblzma-dev \
             libmpv-dev \
-            pkg-config
+            libgstreamer1.0-dev \
+            libgstreamer-plugins-base1.0-dev \
+            libunwind-dev \
+            libsecret-1-dev \
+            libjsoncpp-dev \
+            libgl1-mesa-dev \
+            libx11-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libavcodec-dev \
+            libavformat-dev \
+            libavutil-dev \
+            libswscale-dev \
+            libaom-dev \
+            libdav1d-dev \
+            libyuv-dev
 
       - name: Install Windows build and packaging dependencies
         if: runner.os == 'Windows'
@@ -171,8 +210,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
           Update-SessionEnvironment
-          # Strawberry ships unrelated MinGW tools, including a broken ccache.
-          # Keep those out of this MSVC build without removing Perl itself.
           $nasmDirectory = Join-Path $env:ProgramFiles 'NASM'
           if (-not (Test-Path (Join-Path $nasmDirectory 'nasm.exe'))) {
             throw "Installed NASM was not found in $nasmDirectory"
@@ -246,7 +283,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           args=(
             release
             github
@@ -257,15 +293,12 @@ jobs:
             --output-dir
             "$OUTPUT_DIR"
           )
-
           if [[ "${{ matrix.target }}" == "ipa" ]]; then
             args+=(--no-codesign)
           fi
-
           if [[ "${{ matrix.target }}" == "windows-zip" ]]; then
             args+=(--flutter-verbose)
           fi
-
           ./build.sh "${args[@]}" 2>&1 | tee "$RUNNER_TEMP/boorusama-build.log"
 
       - name: Upload build diagnostics
@@ -289,9 +322,9 @@ jobs:
           if-no-files-found: error
 
   publish:
-    if: github.actor == 'khoadng' && !inputs.smoke_run && !inputs.windows_only
+    if: ${{ !inputs.smoke_run && !inputs.windows_only }}
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       GH_TOKEN: ${{ github.token }}
@@ -300,7 +333,7 @@ jobs:
       - name: Check out Boorusama
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.release_tag }}
+          ref: ${{ inputs.release_tag || github.ref }}
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -314,36 +347,38 @@ jobs:
           path: release-assets
 
       - name: Delete existing release
-        if: inputs.recreate_release
+        if: inputs.recreate_release || github.event_name == 'push'
         shell: bash
         run: |
           set -euo pipefail
-          gh release delete "${{ inputs.release_tag }}" \
+          TAG="${{ inputs.release_tag || github.ref_name }}"
+          gh release delete "$TAG" \
             --repo "${{ github.repository }}" \
             --cleanup-tag \
             --yes || true
 
-      - name: Publish draft GitHub release
+      - name: Publish GitHub release
         shell: bash
         run: |
           set -euo pipefail
-
+          TAG="${{ inputs.release_tag || github.ref_name }}"
           args=(
             release
             github
             publish
             --ci
+            --no-draft
             --repo
             "${{ github.repository }}"
             --artifacts-dir
             release-assets
+            --target apk
+            --target linux-tar.gz
+            --target appimage
           )
-
-          args+=(--tag "${{ inputs.release_tag }}")
-          args+=(--title "Boorusama ${{ inputs.release_tag }}")
-
-          if [[ "${{ inputs.prerelease }}" == "true" ]]; then
+          args+=(--tag "$TAG")
+          args+=(--title "Boorusama $TAG")
+          if [[ "${{ inputs.prerelease }}" == "true" || "$TAG" == *"beta"* || "$TAG" == *"alpha"* ]]; then
             args+=(--prerelease)
           fi
-
           ./build.sh "${args[@]}"

@@ -105,7 +105,7 @@ class DownloadFileNameBuilder<T extends Post>
     final ext = fileExt.startsWith('.') ? fileExt : '.$fileExt';
 
     // make sure to clean up the file name to avoid invalid file names
-    final cleanedFileName = fileName.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
+    final cleanedFileName = fileName.replaceAll(RegExp(r'[<>:"|?\*]'), '_');
 
     return cleanedFileName.endsWith(ext)
         ? cleanedFileName

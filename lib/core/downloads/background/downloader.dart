@@ -35,15 +35,14 @@ class BackgroundDownloader implements DownloadService {
   @override
   Future<DownloadResult> download(DownloadOptions options) async {
     final pathInfo = PathInfo.from(options.path);
-
     final (targetDir, baseDirectory, error) = switch (pathInfo) {
       // Valid Android paths with public directory
       AndroidInternalStorage(:final publicDirectory?, :final path) ||
       AndroidSdCardStorage(
         :final publicDirectory?,
         :final path,
-      ) => (path, BaseDirectory.root, null),
-
+      ) =>
+        (path, BaseDirectory.root, null),
       // Android paths without public directory - check scoped storage
       final AndroidPathInfo pathInfo
           when pathInfo.requiresPublicDirectory(androidSdkInt) =>
@@ -52,29 +51,26 @@ class BackgroundDownloader implements DownloadService {
           BaseDirectory.root,
           _createScopedStorageError(options.filename, pathInfo.path),
         ),
-
       // Android paths without public directory - pre-scoped storage
       AndroidInternalStorage(:final path) ||
       AndroidSdCardStorage(:final path) ||
-      AndroidOtherStorage(:final path) => (path, BaseDirectory.root, null),
-
+      AndroidOtherStorage(:final path) =>
+        (path, BaseDirectory.root, null),
       // iOS/Desktop - allow custom paths
       IOSPath(:final path) ||
-      DesktopPath(:final path) => (path, BaseDirectory.root, null),
-
+      DesktopPath(:final path) =>
+        (path, BaseDirectory.root, null),
       // Invalid cases - return errors
       InvalidPath(:final path) => (
         null,
         BaseDirectory.root,
         _createInvalidPathError(options.filename, path),
       ),
-
       UnsupportedPlatform(:final path) => (
         null,
         BaseDirectory.root,
         _createUnsupportedPlatformError(options.filename, path),
       ),
-
       // Default path - use system default
       DefaultPath() => await _getDefaultDirectory(),
     };
@@ -106,8 +102,40 @@ class BackgroundDownloader implements DownloadService {
     return FileDownloader().resumeAll(group: group);
   }
 
-  String _sanitizeFilename(String filename) {
-    return filename.replaceAll('/', '_');
+  /// Sanitizes a single path component (directory or filename).
+  /// - Removes directory traversal attempts (../)
+  /// - Strips leading/trailing slashes
+  /// - Replaces filesystem-unsafe characters
+  String _sanitizePathComponent(String part) {
+    var clean = part;
+
+    // Remove directory traversal sequences
+    while (clean.contains('../') || clean.contains('..\\')) {
+      clean = clean.replaceAll('../', '').replaceAll('..\\', '');
+    }
+
+    // If the component is exactly "..", clear it
+    if (clean == '..') return '';
+
+    // Strip leading/trailing slashes and backslashes
+    clean = clean
+        .replaceAll(RegExp(r'^[\\/]+'), '')
+        .replaceAll(RegExp(r'[\\/]+$'), '');
+
+    // Replace filesystem-unsafe characters
+    clean = clean.replaceAll(RegExp(r'[<>:"|?*]'), '_');
+
+    return clean.trim();
+  }
+
+  /// Splits a filename into path components and sanitizes each one.
+  /// Returns a list of non-empty path segments.
+  List<String> _sanitizePathComponents(String filename) {
+    return filename
+        .split('/')
+        .map(_sanitizePathComponent)
+        .where((part) => part.isNotEmpty)
+        .toList();
   }
 
   Future<DownloadResult> _executeDownload({
@@ -116,15 +144,39 @@ class BackgroundDownloader implements DownloadService {
     required DownloadOptions options,
   }) async {
     try {
+      // 1. Sanitize path and split into subdirectories + filename
+      final pathParts = _sanitizePathComponents(options.filename);
+
+      if (pathParts.isEmpty) {
+        return DownloadFailure(
+          GenericDownloadError(
+            savedPath: const None(),
+            fileName: options.filename,
+            message: 'Invalid filename after sanitization',
+          ),
+        );
+      }
+
+      final actualFilename = pathParts.last;
+      final subDirs = pathParts.sublist(0, pathParts.length - 1);
+
+      // 2. Build the final directory including subdirectories from tags
+      String finalDirectory = targetDir ?? '';
+      if (subDirs.isNotEmpty) {
+        final subDirPath = subDirs.join('/');
+        finalDirectory = finalDirectory.isEmpty
+            ? subDirPath
+            : '$finalDirectory/$subDirPath';
+      }
+
+      // 3. Create the download task with sanitized filename and directory
       var task = DownloadTask(
         url: options.url,
-        filename: _sanitizeFilename(
-          options.filename,
-        ),
+        filename: actualFilename,
         allowPause: true,
         retries: 1,
         baseDirectory: baseDirectory,
-        directory: targetDir ?? '',
+        directory: finalDirectory,
         updates: Updates.statusAndProgress,
         metaData: options.metadata?.toJsonString() ?? '',
         headers: options.headers,
@@ -132,12 +184,15 @@ class BackgroundDownloader implements DownloadService {
         requiresWiFi: options.networkConstraint.requiresWiFi,
       );
 
+      // 4. Handle sidecar data if present
       SidecarStore? sidecars;
       var metadataSkipped = false;
       if (options.sidecar case final snapshot?) {
         final path = await task.filePath();
         if ((options.skipIfExists ?? false) && fs.fileExistsSync(path)) {
-          return DownloadSkipped(DownloadTaskInfo(path: path, id: task.taskId));
+          return DownloadSkipped(
+            DownloadTaskInfo(path: path, id: task.taskId),
+          );
         }
         sidecars = await _prepareSidecar(task.taskId, path, snapshot);
         if (sidecars == null) {
@@ -153,6 +208,7 @@ class BackgroundDownloader implements DownloadService {
         }
       }
 
+      // 5. Try serving from cache first
       final cacheResult = await _tryDownloadFromCache(
         targetDir: targetDir,
         options: options,
@@ -177,14 +233,17 @@ class BackgroundDownloader implements DownloadService {
       }
 
       _log(
-        'Starting download: ${options.url} to $targetDir/${options.filename}',
+        'Starting download: ${options.url} to $finalDirectory/$actualFilename',
       );
 
+      // 6. Enqueue the download
       final result = await FileDownloader().enqueueIfNeeded(
         task,
         skipIfExists: options.skipIfExists,
         fs: fs,
       );
+
+      // 7. Discard sidecar if enqueue failed
       if (sidecars != null && result is! DownloadEnqueued) {
         await sidecars.discard(task.taskId);
       }
@@ -213,7 +272,6 @@ class BackgroundDownloader implements DownloadService {
     required DownloadOptions options,
   }) async {
     final isVideo = options.metadata?.isVideo ?? false;
-
     if (videoCacheManager case final vcm? when isVideo && targetDir != null) {
       final cachedPath = await vcm.getCachedVideoPath(options.url);
       if (cachedPath case final cp?) {
@@ -233,12 +291,11 @@ class BackgroundDownloader implements DownloadService {
         }
       }
     }
-
     return null;
   }
 
   Future<(String?, BaseDirectory, DownloadError?)>
-  _getDefaultDirectory() async {
+      _getDefaultDirectory() async {
     return switch (await tryGetDownloadDirectory(fs)) {
       DownloadDirectorySuccess(:final path) => (
         path,
@@ -288,12 +345,30 @@ class BackgroundDownloader implements DownloadService {
       throw Exception('Cached file not found: $cachedPath');
     }
 
-    // Ensure target directory exists
-    if (!fs.directoryExistsSync(targetDir)) {
-      await fs.createDirectory(targetDir, recursive: true);
+    // Sanitize path and split into subdirectories + filename
+    final pathParts = _sanitizePathComponents(filename);
+    if (pathParts.isEmpty) {
+      throw Exception('Invalid filename after sanitization');
     }
 
-    final targetPath = join(targetDir, filename);
+    final actualFilename = pathParts.last;
+    final subDirs = pathParts.sublist(0, pathParts.length - 1);
+
+    // Build the final directory including subdirectories from tags
+    String finalDirectory = targetDir;
+    if (subDirs.isNotEmpty) {
+      final subDirPath = subDirs.join('/');
+      finalDirectory = finalDirectory.isEmpty
+          ? subDirPath
+          : '$finalDirectory/$subDirPath';
+    }
+
+    // Ensure target directory exists (recursive for nested subdirs)
+    if (!fs.directoryExistsSync(finalDirectory)) {
+      await fs.createDirectory(finalDirectory, recursive: true);
+    }
+
+    final targetPath = join(finalDirectory, actualFilename);
 
     // Check if target file already exists
     if ((skipIfExists ?? false) && fs.fileExistsSync(targetPath)) {
@@ -307,7 +382,6 @@ class BackgroundDownloader implements DownloadService {
 
     // Copy cached file to target location
     await fs.copyFile(cachedPath, targetPath);
-
     return DownloadCompleted(
       DownloadTaskInfo(
         path: targetPath,
@@ -354,18 +428,22 @@ class TaskResponseAdapter implements HttpResponse {
 
   @override
   final int? statusCode;
+
   @override
   final dynamic data;
+
   @override
   Uri get requestUri => Uri.tryParse(_update.task.url) ?? Uri();
+
   @override
   Map<String, dynamic> get headers => Map<String, dynamic>.from(
-    _update.responseHeaders ?? <String, String>{},
-  );
+        _update.responseHeaders ?? <String, String>{},
+      );
 }
 
 class TaskErrorAdapter implements HttpError {
   const TaskErrorAdapter(this._update);
+
   final TaskStatusUpdate _update;
 
   @override
@@ -374,7 +452,6 @@ class TaskErrorAdapter implements HttpError {
       final TaskHttpException e => e.httpResponseCode,
       _ => null,
     };
-
     final body = switch (_update.exception) {
       final TaskHttpException e => e.description,
       _ => null,
@@ -389,6 +466,7 @@ class TaskErrorAdapter implements HttpError {
 
   @override
   Uri get requestUri => Uri.tryParse(_update.task.url) ?? Uri();
+
   @override
   String? get message => _update.exception?.description;
 }
