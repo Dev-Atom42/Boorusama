@@ -47,7 +47,7 @@ extensions.configure<ApplicationExtension> {
     }
 
     defaultConfig {
-        applicationId = "com.degenk.boorusama"
+        applicationId = "com.glack.boorusama"
         minSdk = minSdkVersion
         targetSdk = targetSdkVersion
         versionCode = flutter.versionCode
@@ -56,6 +56,13 @@ extensions.configure<ApplicationExtension> {
     }
 
     signingConfigs {
+        getByName("debug") {
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            storeFile = rootProject.file("keystore/debug.jks")
+            storePassword = "android"
+        }
+
         create("release") {
             if (hasValidKeystore) {
                 keyAlias = keystoreProperties["keyAlias"] as String
@@ -65,16 +72,13 @@ extensions.configure<ApplicationExtension> {
             }
         }
     }
-   
+
     buildTypes {
         release {
-            signingConfig = if (hasValidKeystore) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
-            ndk {
-                debugSymbolLevel = "SYMBOL_TABLE"
-                if (!splitPerAbi) {
-                    abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86_64"))
-                }
-            }
+            signingConfig = if (hasValidKeystore)
+                signingConfigs.getByName("release")
+            else
+                signingConfigs.getByName("debug")
         }
     }
 

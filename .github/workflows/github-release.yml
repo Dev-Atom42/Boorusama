@@ -1,6 +1,9 @@
 name: GitHub release
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       release_tag:
@@ -35,7 +38,6 @@ concurrency:
 
 jobs:
   preflight:
-    if: github.actor == 'khoadng'
     name: Validate shared toolchain
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -45,14 +47,12 @@ jobs:
       - name: Check out Boorusama
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.release_tag }}
-
+          ref: ${{ inputs.release_tag || github.ref }}
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version-file: .fvmrc
           cache: true
-
       - name: Validate Flutter and Dart dependencies
         shell: bash
         run: |
@@ -62,7 +62,6 @@ jobs:
           flutter pub get --enforce-lockfile
 
   build:
-    if: github.actor == 'khoadng'
     needs: preflight
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
@@ -70,36 +69,30 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.windows_only && !inputs.smoke_run &&
-          '[{"target":"windows-zip","os":"windows-latest","artifact_name":"boorusama-windows-zip"}]' ||
-          '[{"target":"apk","os":"ubuntu-latest","artifact_name":"boorusama-apk"},
-            {"target":"linux-tar.gz","os":"ubuntu-latest","artifact_name":"boorusama-linux-tar-gz"},
-            {"target":"appimage","os":"ubuntu-latest","artifact_name":"boorusama-appimage"},
-            {"target":"windows-zip","os":"windows-latest","artifact_name":"boorusama-windows-zip"},
-            {"target":"ipa","os":"macos-latest","artifact_name":"boorusama-ipa"},
-            {"target":"dmg","os":"macos-latest","artifact_name":"boorusama-dmg"}]') }}
-
+        include:
+          - target: apk
+            os: ubuntu-latest
+            artifact_name: boorusama-apk
+          - target: linux-tar.gz
+            os: ubuntu-latest
+            artifact_name: boorusama-linux-tar-gz
+          - target: appimage
+            os: ubuntu-latest
+            artifact_name: boorusama-appimage
     env:
       BOORUSAMA_USE_FVM: "false"
       OUTPUT_DIR: release-artifacts/${{ matrix.target }}
-
     steps:
       - name: Check out Boorusama
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.release_tag }}
+          ref: ${{ inputs.release_tag || github.ref }}
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version-file: .fvmrc
           cache: true
-
-      - name: Set up Xcode
-        if: runner.os == 'macOS'
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
 
       - name: Set up Android SDK
         if: matrix.target == 'apk'
@@ -121,19 +114,44 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y meson ninja-build nasm
 
-      - name: Install Linux desktop dependencies
-        if: matrix.target == 'linux-tar.gz' || matrix.target == 'appimage'
+      - name: Install system dependencies
+        if: matrix.os == 'ubuntu-latest'
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y \
-            clang \
+            build-essential \
             cmake \
+            ninja-build \
+            meson \
+            nasm \
+            yasm \
+            pkg-config \
+            python3 \
+            git \
+            unzip \
             libgtk-3-dev \
             liblzma-dev \
             libmpv-dev \
-            pkg-config
+            libgstreamer1.0-dev \
+            libgstreamer-plugins-base1.0-dev \
+            libunwind-dev \
+            libsecret-1-dev \
+            libjsoncpp-dev \
+            libgl1-mesa-dev \
+            libx11-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libavcodec-dev \
+            libavformat-dev \
+            libavutil-dev \
+            libswscale-dev \
+            libaom-dev \
+            libdav1d-dev \
+            libyuv-dev
 
       - name: Install Windows build and packaging dependencies
         if: runner.os == 'Windows'
@@ -144,8 +162,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
           Update-SessionEnvironment
-          # Strawberry ships unrelated MinGW tools, including a broken ccache.
-          # Keep those out of this MSVC build without removing Perl itself.
           $nasmDirectory = Join-Path $env:ProgramFiles 'NASM'
           if (-not (Test-Path (Join-Path $nasmDirectory 'nasm.exe'))) {
             throw "Installed NASM was not found in $nasmDirectory"
@@ -219,7 +235,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           args=(
             release
             github
@@ -230,15 +245,12 @@ jobs:
             --output-dir
             "$OUTPUT_DIR"
           )
-
           if [[ "${{ matrix.target }}" == "ipa" ]]; then
             args+=(--no-codesign)
           fi
-
           if [[ "${{ matrix.target }}" == "windows-zip" ]]; then
             args+=(--flutter-verbose)
           fi
-
           ./build.sh "${args[@]}" 2>&1 | tee "$RUNNER_TEMP/boorusama-build.log"
 
       - name: Upload build diagnostics
@@ -262,7 +274,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    if: github.actor == 'khoadng' && !inputs.smoke_run && !inputs.windows_only
+    if: github.actor ==  !inputs.smoke_run
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -273,7 +285,7 @@ jobs:
       - name: Check out Boorusama
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.release_tag }}
+          ref: ${{ inputs.release_tag || github.ref }}
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -287,11 +299,12 @@ jobs:
           path: release-assets
 
       - name: Delete existing release
-        if: inputs.recreate_release
+        if: inputs.recreate_release || github.event_name == 'push'
         shell: bash
         run: |
           set -euo pipefail
-          gh release delete "${{ inputs.release_tag }}" \
+          TAG="${{ inputs.release_tag || github.ref_name }}"
+          gh release delete "$TAG" \
             --repo "${{ github.repository }}" \
             --cleanup-tag \
             --yes || true
@@ -300,7 +313,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
+          TAG="${{ inputs.release_tag || github.ref_name }}"
           args=(
             release
             github
@@ -310,13 +323,13 @@ jobs:
             "${{ github.repository }}"
             --artifacts-dir
             release-assets
+            --target apk
+            --target linux-tar.gz
+            --target appimage
           )
-
-          args+=(--tag "${{ inputs.release_tag }}")
-          args+=(--title "Boorusama ${{ inputs.release_tag }}")
-
-          if [[ "${{ inputs.prerelease }}" == "true" ]]; then
+          args+=(--tag "$TAG")
+          args+=(--title "Boorusama $TAG")
+          if [[ "${{ inputs.prerelease }}" == "true" || "$TAG" == *"beta"* || "$TAG" == *"alpha"* ]]; then
             args+=(--prerelease)
           fi
-
           ./build.sh "${args[@]}"

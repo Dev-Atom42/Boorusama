@@ -1,3 +1,6 @@
+# 4.5.1
+- Add additional subdirectory downloads support.
+
 # Prereleased-2026.09.14
 - Add PIN app lock and app-preview blur for privacy
 - Add an option to download only over Wi-Fi
