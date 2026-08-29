@@ -102,6 +102,19 @@ class BackgroundDownloader implements DownloadService {
     return FileDownloader().resumeAll(group: group);
   }
 
+  String _sanitizePathComponent(String part) {
+    var clean = part;
+
+    while (clean.contains('../') || clean.contains('..\\')) {
+      clean = clean.replaceAll('../', '').replaceAll('..\\', '');
+    }
+
+    if (clean == '..') return '';
+    clean = clean.replaceAll(RegExp(r'^[\\/]+'), '').replaceAll(RegExp(r'[\\/]+$'), '');
+    clean = clean.replaceAll(RegExp(r'[<>:"|?*]'), '_');
+    return clean.trim();
+  }
+
   String _sanitizeFilename(String filename) {
     return filename.replaceAll(RegExp(r'[<>:"|?\*]'), '_');
   }
@@ -120,11 +133,25 @@ class BackgroundDownloader implements DownloadService {
         return result;
       }
 
-      final sanitizedFilename = _sanitizeFilename(options.filename);
-      final pathParts = sanitizedFilename.split('/');
+      final rawParts = options.filename.split('/');
+      final pathParts = rawParts
+          .map(_sanitizePathComponent)
+          .where((part) => part.isNotEmpty)
+          .toList();
+
+      if (pathParts.isEmpty) {
+        return DownloadFailure(
+          GenericDownloadError(
+            savedPath: const None(),
+            fileName: options.filename,
+            message: 'Invalid filename after sanitization',
+          ),
+        );
+      }
+
       final actualFilename = pathParts.last;
       final subDirs = pathParts.sublist(0, pathParts.length - 1);
-    
+
       String finalDirectory = targetDir ?? '';
       if (subDirs.isNotEmpty) {
         final subDirPath = subDirs.join('/');
@@ -132,7 +159,7 @@ class BackgroundDownloader implements DownloadService {
             ? subDirPath 
             : '$finalDirectory/$subDirPath';
       }
-  
+
       final task = DownloadTask(
         url: options.url,
         filename: actualFilename,
@@ -254,17 +281,32 @@ class BackgroundDownloader implements DownloadService {
       throw Exception('Cached file not found: $cachedPath');
     }
 
-    // Ensure target directory exists
-    if (!fs.directoryExistsSync(targetDir)) {
-      await fs.createDirectory(targetDir, recursive: true);
+    final rawParts = filename.split('/');
+    final pathParts = rawParts
+        .map(_sanitizePathComponent)
+        .where((part) => part.isNotEmpty)
+        .toList();
+
+    if (pathParts.isEmpty) {
+      throw Exception('Invalid filename after sanitization');
     }
 
-    final targetPath = join(targetDir, filename);
+    final actualFilename = pathParts.last;
+    final subDirs = pathParts.sublist(0, pathParts.length - 1);
 
-    final targetFileDir = dirname(targetPath);
-    if (!fs.directoryExistsSync(targetFileDir)) {
-      await fs.createDirectory(targetFileDir, recursive: true);
+    String finalDirectory = targetDir;
+    if (subDirs.isNotEmpty) {
+      final subDirPath = subDirs.join('/');
+      finalDirectory = finalDirectory.isEmpty 
+          ? subDirPath 
+          : '$finalDirectory/$subDirPath';
     }
+
+    if (!fs.directoryExistsSync(finalDirectory)) {
+      await fs.createDirectory(finalDirectory, recursive: true);
+    }
+  
+    final targetPath = join(finalDirectory, actualFilename);
 
     if ((skipIfExists ?? false) && fs.fileExistsSync(targetPath)) {
       return DownloadSkipped(
@@ -276,27 +318,6 @@ class BackgroundDownloader implements DownloadService {
     }
 
     await fs.copyFile(cachedPath, targetPath);
-    return DownloadCompleted(
-      DownloadTaskInfo(
-        path: targetPath,
-        id: 'cached_${DateTime.now().millisecondsSinceEpoch}',
-      ),
-      source: DownloadCompletionSource.cache,
-    );
-
-    // Check if target file already exists
-    if ((skipIfExists ?? false) && fs.fileExistsSync(targetPath)) {
-      return DownloadSkipped(
-        DownloadTaskInfo(
-          path: targetPath,
-          id: 'existing_${DateTime.now().millisecondsSinceEpoch}',
-        ),
-      );
-    }
-
-    // Copy cached file to target location
-    await fs.copyFile(cachedPath, targetPath);
-
     return DownloadCompleted(
       DownloadTaskInfo(
         path: targetPath,

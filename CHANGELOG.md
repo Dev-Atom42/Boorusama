@@ -1,3 +1,6 @@
+# 4.5.1
+- Add additional subdirectory downloads support.
+
 # 4.5.0
 - Add support for Nozomi
 - [Sankaku] Add favorite support
