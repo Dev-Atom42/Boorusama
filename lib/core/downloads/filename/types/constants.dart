@@ -17,6 +17,7 @@ const kDanbooruPostSamples = [
     'rating': 'general',
     'index': '0',
     'search': 'genshin_impact solo',
+    'type': 'image',
   },
   {
     'id': '654321',
@@ -25,7 +26,7 @@ const kDanbooruPostSamples = [
     'copyright': 'vocaloid',
     'general': '1girl solo',
     'meta': 'highres translated',
-    'tags': '1girl solo hatsune_miku vocaloid highres translated',
+    'tags': '1girl solo hatsune_miku vocaloid highres translated animated',
     'extension': 'png',
     'md5': '2ebd75de757488e29cf364e77f46183e',
     'width': '1334',
@@ -36,5 +37,6 @@ const kDanbooruPostSamples = [
     'rating': 'general',
     'index': '1',
     'search': '1girl solo',
+    'type': 'gif',
   },
 ];

@@ -1,17 +1,15 @@
 name: GitHub release
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
-      release_tag:
-        description: "Release tag or branch to build"
+      draft:
+        description: "Create the release as a draft for manual review"
         required: true
-        default: ""
+        type: boolean
+        default: false
       prerelease:
-        description: "Mark the draft release as a prerelease"
+        description: "Mark the release as a prerelease"
         required: true
         type: boolean
         default: false
@@ -21,11 +19,7 @@ on:
         type: boolean
         default: false
       smoke_run:
-        description: "Build all platforms; skip release publication."
-        type: boolean
-        default: false
-      windows_only:
-        description: "Build only Windows; skip release publication."
+        description: "Build artifacts; skip release publication."
         type: boolean
         default: false
 
@@ -47,7 +41,7 @@ jobs:
       - name: Check out Boorusama
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.release_tag || github.ref }}
+          ref: ${{ github.ref }}
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -86,7 +80,7 @@ jobs:
       - name: Check out Boorusama
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.release_tag || github.ref }}
+          ref: ${{ github.ref }}
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -201,49 +195,6 @@ jobs:
             libdav1d-dev \
             libyuv-dev
 
-      - name: Install Windows build and packaging dependencies
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $buildPath = $env:PATH
-          choco install meson ninja nasm --yes --no-progress
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
-          Update-SessionEnvironment
-          $nasmDirectory = Join-Path $env:ProgramFiles 'NASM'
-          if (-not (Test-Path (Join-Path $nasmDirectory 'nasm.exe'))) {
-            throw "Installed NASM was not found in $nasmDirectory"
-          }
-          $env:PATH = (("$nasmDirectory;$buildPath;$env:PATH" -split ';' | Where-Object {
-            $_ -and $_.Trim().Trim('"').TrimEnd('\', '/') -notmatch '(?i)[\\/]Strawberry[\\/]c[\\/]bin$'
-          }) | Select-Object -Unique) -join ';'
-          "PATH=$env:PATH" | Add-Content -Path $env:GITHUB_ENV
-          Get-Command Compress-Archive
-
-      - name: Select Visual Studio CMake for Windows native builds
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-          $installation = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.VC.CMake.Project -property installationPath
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if (-not $installation) { throw 'Visual Studio with C++ and CMake tools was not found.' }
-          $cmake = Join-Path $installation 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe'
-          if (-not (Test-Path $cmake)) { throw "Visual Studio CMake was not found: $cmake" }
-          "CMAKE=$cmake" | Add-Content -Path $env:GITHUB_ENV
-          Split-Path $cmake | Add-Content -Path $env:GITHUB_PATH
-          Write-Host "Using CMake: $cmake"
-          & $cmake --version
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Install Apple build and packaging dependencies
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          set -euo pipefail
-          brew install create-dmg meson ninja nasm
-          sudo gem install cocoapods
-
       - name: Check native build tools
         shell: bash
         run: |
@@ -251,27 +202,6 @@ jobs:
           meson --version
           ninja --version
           nasm --version
-
-      - name: Enable Git long paths on Windows
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: git config --global core.longpaths true
-
-      - name: Check Windows compiler cache selection
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          foreach ($name in @('ccache', 'sccache')) {
-            $tool = Get-Command $name -CommandType Application -ErrorAction SilentlyContinue
-            if ($tool) {
-              Write-Host "Using ${name}: $($tool.Source)"
-              if ($tool.Source -match '(?i)[\\/]Strawberry[\\/]c[\\/]bin[\\/]') {
-                throw "Strawberry compiler tools must not be on the build PATH: $($tool.Source)"
-              }
-              & $tool.Source --version
-              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            }
-          }
 
       - name: Initialize workspace
         shell: bash
@@ -293,12 +223,6 @@ jobs:
             --output-dir
             "$OUTPUT_DIR"
           )
-          if [[ "${{ matrix.target }}" == "ipa" ]]; then
-            args+=(--no-codesign)
-          fi
-          if [[ "${{ matrix.target }}" == "windows-zip" ]]; then
-            args+=(--flutter-verbose)
-          fi
           ./build.sh "${args[@]}" 2>&1 | tee "$RUNNER_TEMP/boorusama-build.log"
 
       - name: Upload build diagnostics
@@ -322,7 +246,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    if: ${{ !inputs.smoke_run && !inputs.windows_only }}
+    if: ${{ !inputs.smoke_run }}
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -333,7 +257,7 @@ jobs:
       - name: Check out Boorusama
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.release_tag || github.ref }}
+          ref: ${{ github.ref }}
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -347,11 +271,11 @@ jobs:
           path: release-assets
 
       - name: Delete existing release
-        if: inputs.recreate_release || github.event_name == 'push'
+        if: inputs.recreate_release
         shell: bash
         run: |
           set -euo pipefail
-          TAG="${{ inputs.release_tag || github.ref_name }}"
+          TAG="${{ github.ref_name }}"
           gh release delete "$TAG" \
             --repo "${{ github.repository }}" \
             --cleanup-tag \
@@ -361,13 +285,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="${{ inputs.release_tag || github.ref_name }}"
+          TAG="${{ github.ref_name }}"
+          case "$TAG" in
+            v*) ;;
+            *)
+              echo "::error::The release tag is taken from the ref this workflow runs on ('$TAG'). Run the workflow from a v* tag via the branch/tag picker, or enable smoke_run for a build-only run."
+              exit 1
+              ;;
+          esac
           args=(
             release
             github
             publish
             --ci
-            --no-draft
             --repo
             "${{ github.repository }}"
             --artifacts-dir
@@ -376,6 +306,9 @@ jobs:
             --target linux-tar.gz
             --target appimage
           )
+          if [[ "${{ inputs.draft }}" != "true" ]]; then
+            args+=(--no-draft)
+          fi
           args+=(--tag "$TAG")
           args+=(--title "Boorusama $TAG")
           if [[ "${{ inputs.prerelease }}" == "true" || "$TAG" == *"beta"* || "$TAG" == *"alpha"* ]]; then

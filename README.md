@@ -13,6 +13,8 @@ This is a fork of the original [Boorusama](https://github.com/khoadng/Boorusama)
 - **Subdirectory downloads** — save files into nested folders based on tags or custom text in the filename template.  
   Slashes (`/`) in the filename format are now interpreted as directory separators.  
   Example: if the download path is `/booru` and the filename is `{artist}/{id}.jpg`, the file will be saved as `/booru/artist_name/12345.jpg`. Empty tags and path traversal attempts (`../`, leading/trailing slashes) are automatically sanitized.
+- **Media type token `{type}`** — sort downloads by media class using the filename template. The token expands to one of `image` / `gif` / `video` / `zip` / `flash` and works both as a directory and inside the file name.
+  Classification: `mp4`/`webm` are `video`, `swf` is `flash`, `gif` is always `gif`, ugoira `zip` archives are `zip`; `png`/`webp`/`avif` become `gif` when the post carries an `animated` tag or a positive duration, otherwise `image`. The token is sync (no extra requests) on every booru.
 - Only **Android** and **GNU/Linux** are supported by the automated GitHub Actions builds. I don’t use other platforms, and I can’t guarantee full compatibility with them if major changes are introduced in the future. If you need a build for a platform not covered by the automated builds, you can compile the source code manually.  
 - Android now uses a new package name to avoid conflicts with the main app, in case you need to install both.  
 - Fork-only changes and the upstream sync history are tracked in [FORK.md](FORK.md).

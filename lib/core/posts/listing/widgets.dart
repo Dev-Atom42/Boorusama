@@ -13,3 +13,4 @@ export 'src/widgets/default_image_quick_actions.dart';
 export 'src/widgets/default_image_grid_item.dart';
 export 'src/widgets/post_grid_config_icon_button.dart';
 export 'src/widgets/post_preview.dart';
+export 'src/widgets/post_grid_file_info_badges.dart';
