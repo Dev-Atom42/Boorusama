@@ -13,7 +13,9 @@ import '../../../../settings/providers.dart';
 import '../../../post/tags.dart';
 import '../../../post/types.dart';
 import '../../../post/widgets.dart';
+import '../types/grid_size.dart';
 import '../types/image_list_type.dart';
+import 'post_grid_file_info_badges.dart';
 
 class BlockOverlayItem {
   const BlockOverlayItem({
@@ -72,10 +74,45 @@ class SliverPostGridImageGridItem<T extends Post> extends ConsumerWidget {
       ),
     );
 
+    final gridSize = ref.watch(
+      imageListingSettingsProvider.select((value) => value.gridSize),
+    );
+
+    final showResolutionInGrid = ref.watch(
+      imageListingSettingsProvider.select(
+        (value) => value.showResolutionInGrid,
+      ),
+    );
+
+    final showFileSizeInGrid = ref.watch(
+      imageListingSettingsProvider.select(
+        (value) => value.showFileSizeInGrid,
+      ),
+    );
+
+    final showSourceLogoInGrid = ref.watch(
+      imageListingSettingsProvider.select(
+        (value) => value.showSourceLogoInGrid,
+      ),
+    );
+
     final scoreWidget = showScoresInGrid
         ? score.toOption().fold(
             () => null,
             (s) => s == 0 ? null : ImageScoreWidget(score: s),
+          )
+        : null;
+
+    final fileInfoBadges =
+        showResolutionInGrid || showFileSizeInGrid || showSourceLogoInGrid
+        ? PostGridFileInfoBadges(
+            post: post,
+            showSourceLogo: showSourceLogoInGrid,
+            showResolution: showResolutionInGrid,
+            showFileSize: showFileSizeInGrid,
+            // hide the text badges on tiny tiles where they would not fit;
+            // the source favicon stays
+            compact: gridSize == GridSize.tiny || gridSize == GridSize.micro,
           )
         : null;
 
@@ -126,6 +163,12 @@ class SliverPostGridImageGridItem<T extends Post> extends ConsumerWidget {
             duration: post.duration,
             scoreWidget: scoreWidget,
           ),
+          if (fileInfoBadges != null)
+            Positioned(
+              top: 1,
+              right: 1,
+              child: fileInfoBadges,
+            ),
           if (overlay != null) ...[
             Positioned.fill(
               child: InkWell(

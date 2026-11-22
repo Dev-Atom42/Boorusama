@@ -156,6 +156,24 @@ class _ImageListingSettingsSectionState
               _onUpdate(settings.copyWith(showScoresInGrid: value)),
         ),
         KurumiSwitchListTile(
+          title: Text(context.t.settings.appearance.show_resolution),
+          value: settings.showResolutionInGrid,
+          onChanged: (value) =>
+              _onUpdate(settings.copyWith(showResolutionInGrid: value)),
+        ),
+        KurumiSwitchListTile(
+          title: Text(context.t.settings.appearance.show_file_size),
+          value: settings.showFileSizeInGrid,
+          onChanged: (value) =>
+              _onUpdate(settings.copyWith(showFileSizeInGrid: value)),
+        ),
+        KurumiSwitchListTile(
+          title: Text(context.t.settings.appearance.show_source_logo),
+          value: settings.showSourceLogoInGrid,
+          onChanged: (value) =>
+              _onUpdate(settings.copyWith(showSourceLogoInGrid: value)),
+        ),
+        KurumiSwitchListTile(
           title: Text(
             context.t.settings.appearance.show_post_list_config_header,
           ),

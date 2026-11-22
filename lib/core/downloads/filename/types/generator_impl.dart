@@ -14,6 +14,7 @@ import '../../../posts/post/types.dart';
 import '../../../settings/types.dart';
 import 'async_token_resolver.dart';
 import 'generator.dart';
+import 'media_type.dart';
 import 'token_handler.dart';
 import 'token_options.dart';
 
@@ -39,6 +40,11 @@ class DownloadFileNameBuilder<T extends Post>
       'extension':
           extensionHandler ??
           (post, config) => _extensionFromUrlOrPost(post, config.downloadUrl),
+      'type': (post, config) => resolveMediaType(
+            format: post.format,
+            tags: post.tags,
+            duration: post.duration,
+          ),
       if (hasMd5) 'md5': (post, config) => post.md5,
       if (hasRating) 'rating': (post, config) => post.rating.name,
       'index': (post, config) => config.index?.toString(),
@@ -339,6 +345,7 @@ class DownloadFileNameBuilder<T extends Post>
               'mpixels' => const Color.fromARGB(255, 176, 86, 182),
               'aspect_ratio' => const Color.fromARGB(255, 176, 86, 182),
               'id' => const Color.fromARGB(255, 176, 86, 182),
+              'type' => const Color.fromARGB(255, 0, 186, 160),
               _ => const Color.fromARGB(255, 0, 155, 230),
             },
           ),

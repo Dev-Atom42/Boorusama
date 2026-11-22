@@ -60,6 +60,7 @@ class TokenizerConfigs {
           'case',
         ],
         'extension': [],
+        'type': [],
         'tags': [
           ...tagTokenOptions,
           'nomod',

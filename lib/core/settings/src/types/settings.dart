@@ -148,6 +148,9 @@ class Settings extends Equatable {
       pageIndicatorPosition: PageIndicatorPosition.defaultValue,
       showScoresInGrid: false,
       showPostListConfigHeader: true,
+      showResolutionInGrid: false,
+      showFileSizeInGrid: false,
+      showSourceLogoInGrid: false,
       mediaBlurCondition: MediaBlurCondition.defaultValue,
       imageGridSpacing: 4,
       imageBorderRadius: 4,
@@ -671,6 +674,9 @@ class ImageListingSettings extends Equatable {
     required this.pageIndicatorPosition,
     required this.showScoresInGrid,
     required this.showPostListConfigHeader,
+    required this.showResolutionInGrid,
+    required this.showFileSizeInGrid,
+    required this.showSourceLogoInGrid,
     required this.mediaBlurCondition,
     required this.imageGridSpacing,
     required this.imageBorderRadius,
@@ -689,6 +695,9 @@ class ImageListingSettings extends Equatable {
       ),
       showScoresInGrid = json['showScoresInGrid'] ?? false,
       showPostListConfigHeader = json['showPostListConfigHeader'] ?? true,
+      showResolutionInGrid = json['showResolutionInGrid'] ?? false,
+      showFileSizeInGrid = json['showFileSizeInGrid'] ?? false,
+      showSourceLogoInGrid = json['showSourceLogoInGrid'] ?? false,
       imageBorderRadius = json['imageBorderRadius'],
       pageIndicatorPosition = PageIndicatorPosition.parse(
         json['pageIndicatorPosition'],
@@ -711,6 +720,9 @@ class ImageListingSettings extends Equatable {
   final PageIndicatorPosition pageIndicatorPosition;
   final bool showScoresInGrid;
   final bool showPostListConfigHeader;
+  final bool showResolutionInGrid;
+  final bool showFileSizeInGrid;
+  final bool showSourceLogoInGrid;
   final MediaBlurCondition mediaBlurCondition;
   final double imageGridSpacing;
   final double imageBorderRadius;
@@ -727,6 +739,9 @@ class ImageListingSettings extends Equatable {
     PageIndicatorPosition? pageIndicatorPosition,
     bool? showScoresInGrid,
     bool? showPostListConfigHeader,
+    bool? showResolutionInGrid,
+    bool? showFileSizeInGrid,
+    bool? showSourceLogoInGrid,
     MediaBlurCondition? mediaBlurCondition,
     bool? enableDynamicColoring,
     KurumiThemeMode? themeMode,
@@ -747,6 +762,9 @@ class ImageListingSettings extends Equatable {
       showScoresInGrid: showScoresInGrid ?? this.showScoresInGrid,
       showPostListConfigHeader:
           showPostListConfigHeader ?? this.showPostListConfigHeader,
+      showResolutionInGrid: showResolutionInGrid ?? this.showResolutionInGrid,
+      showFileSizeInGrid: showFileSizeInGrid ?? this.showFileSizeInGrid,
+      showSourceLogoInGrid: showSourceLogoInGrid ?? this.showSourceLogoInGrid,
       mediaBlurCondition: mediaBlurCondition ?? this.mediaBlurCondition,
       imageGridSpacing: imageGridSpacing ?? this.imageGridSpacing,
       imageBorderRadius: imageBorderRadius ?? this.imageBorderRadius,
@@ -766,6 +784,9 @@ class ImageListingSettings extends Equatable {
     'pageIndicatorPosition': pageIndicatorPosition.toData(),
     'showScoresInGrid': showScoresInGrid,
     'showPostListConfigHeader': showPostListConfigHeader,
+    'showResolutionInGrid': showResolutionInGrid,
+    'showFileSizeInGrid': showFileSizeInGrid,
+    'showSourceLogoInGrid': showSourceLogoInGrid,
     'mediaBlurCondition': mediaBlurCondition.toData(),
     'imageGridSpacing': imageGridSpacing,
     'imageBorderRadius': imageBorderRadius,
@@ -784,6 +805,9 @@ class ImageListingSettings extends Equatable {
     pageIndicatorPosition,
     showScoresInGrid,
     showPostListConfigHeader,
+    showResolutionInGrid,
+    showFileSizeInGrid,
+    showSourceLogoInGrid,
     mediaBlurCondition,
     imageGridSpacing,
     imageBorderRadius,
