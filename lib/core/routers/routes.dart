@@ -16,6 +16,7 @@ import '../debug/routes.dart';
 import '../donate/routes.dart';
 import '../download_manager/routes.dart';
 import '../downloads/downloader/widgets.dart';
+import '../feed/routes.dart';
 import '../home/widgets.dart';
 import '../posts/details/routes.dart';
 import '../posts/details_manager/routes.dart';
@@ -70,6 +71,7 @@ class Routes {
       settingsRoutes,
       settingsDesktopRoutes,
       bookmarkRoutes,
+      feedRoutes,
       globalBlacklistedTagsRoutes,
       downloadManagerRoutes,
       bulkDownloadsRoutes,

@@ -151,6 +151,8 @@ class Settings extends Equatable {
       showResolutionInGrid: false,
       showFileSizeInGrid: false,
       showSourceLogoInGrid: false,
+      showFileFormatInGrid: false,
+      fileInfoBadgePosition: BadgePosition.defaultValue,
       mediaBlurCondition: MediaBlurCondition.defaultValue,
       imageGridSpacing: 4,
       imageBorderRadius: 4,
@@ -677,6 +679,8 @@ class ImageListingSettings extends Equatable {
     required this.showResolutionInGrid,
     required this.showFileSizeInGrid,
     required this.showSourceLogoInGrid,
+    required this.showFileFormatInGrid,
+    required this.fileInfoBadgePosition,
     required this.mediaBlurCondition,
     required this.imageGridSpacing,
     required this.imageBorderRadius,
@@ -698,6 +702,10 @@ class ImageListingSettings extends Equatable {
       showResolutionInGrid = json['showResolutionInGrid'] ?? false,
       showFileSizeInGrid = json['showFileSizeInGrid'] ?? false,
       showSourceLogoInGrid = json['showSourceLogoInGrid'] ?? false,
+      showFileFormatInGrid = json['showFileFormatInGrid'] ?? false,
+      fileInfoBadgePosition = BadgePosition.parse(
+        json['fileInfoBadgePosition'],
+      ),
       imageBorderRadius = json['imageBorderRadius'],
       pageIndicatorPosition = PageIndicatorPosition.parse(
         json['pageIndicatorPosition'],
@@ -723,6 +731,8 @@ class ImageListingSettings extends Equatable {
   final bool showResolutionInGrid;
   final bool showFileSizeInGrid;
   final bool showSourceLogoInGrid;
+  final bool showFileFormatInGrid;
+  final BadgePosition fileInfoBadgePosition;
   final MediaBlurCondition mediaBlurCondition;
   final double imageGridSpacing;
   final double imageBorderRadius;
@@ -742,6 +752,8 @@ class ImageListingSettings extends Equatable {
     bool? showResolutionInGrid,
     bool? showFileSizeInGrid,
     bool? showSourceLogoInGrid,
+    bool? showFileFormatInGrid,
+    BadgePosition? fileInfoBadgePosition,
     MediaBlurCondition? mediaBlurCondition,
     bool? enableDynamicColoring,
     KurumiThemeMode? themeMode,
@@ -765,6 +777,9 @@ class ImageListingSettings extends Equatable {
       showResolutionInGrid: showResolutionInGrid ?? this.showResolutionInGrid,
       showFileSizeInGrid: showFileSizeInGrid ?? this.showFileSizeInGrid,
       showSourceLogoInGrid: showSourceLogoInGrid ?? this.showSourceLogoInGrid,
+      showFileFormatInGrid: showFileFormatInGrid ?? this.showFileFormatInGrid,
+      fileInfoBadgePosition:
+          fileInfoBadgePosition ?? this.fileInfoBadgePosition,
       mediaBlurCondition: mediaBlurCondition ?? this.mediaBlurCondition,
       imageGridSpacing: imageGridSpacing ?? this.imageGridSpacing,
       imageBorderRadius: imageBorderRadius ?? this.imageBorderRadius,
@@ -787,6 +802,8 @@ class ImageListingSettings extends Equatable {
     'showResolutionInGrid': showResolutionInGrid,
     'showFileSizeInGrid': showFileSizeInGrid,
     'showSourceLogoInGrid': showSourceLogoInGrid,
+    'showFileFormatInGrid': showFileFormatInGrid,
+    'fileInfoBadgePosition': fileInfoBadgePosition.toData(),
     'mediaBlurCondition': mediaBlurCondition.toData(),
     'imageGridSpacing': imageGridSpacing,
     'imageBorderRadius': imageBorderRadius,
@@ -808,6 +825,8 @@ class ImageListingSettings extends Equatable {
     showResolutionInGrid,
     showFileSizeInGrid,
     showSourceLogoInGrid,
+    showFileFormatInGrid,
+    fileInfoBadgePosition,
     mediaBlurCondition,
     imageGridSpacing,
     imageBorderRadius,

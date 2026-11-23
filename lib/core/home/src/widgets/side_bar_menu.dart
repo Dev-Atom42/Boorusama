@@ -17,6 +17,7 @@ import '../../../configs/config/providers.dart';
 import '../../../configs/manage/widgets.dart';
 import '../../../donate/routes.dart';
 import '../../../download_manager/routes.dart';
+import '../../../feed/routes.dart';
 import '../../../premiums/providers.dart';
 import '../../../premiums/routes.dart';
 import '../../../premiums/types.dart';
@@ -134,6 +135,13 @@ class SideBarMenu extends ConsumerWidget {
                           title: Text(context.t.sideMenu.your_bookmarks),
                           onTap: () {
                             goToBookmarkPage(ref);
+                          },
+                        ),
+                        SideMenuTile(
+                          icon: const Icon(Symbols.feed),
+                          title: Text(context.t.sideMenu.your_feed),
+                          onTap: () {
+                            goToFeedPage(ref);
                           },
                         ),
                         SideMenuTile(

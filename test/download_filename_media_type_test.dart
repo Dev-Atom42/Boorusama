@@ -37,7 +37,11 @@ void main() {
 
     test('gif is always gif, with and without the animated tag', () {
       expect(
-        resolveMediaType(format: 'gif', tags: tags(animated: true), duration: 5),
+        resolveMediaType(
+          format: 'gif',
+          tags: tags(animated: true),
+          duration: 5,
+        ),
         'gif',
       );
       expect(

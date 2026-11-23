@@ -17,6 +17,7 @@ import '../../../configs/config/providers.dart';
 import '../../../configs/manage/widgets.dart';
 import '../../../donate/routes.dart';
 import '../../../download_manager/widgets.dart';
+import '../../../feed/routes.dart';
 import '../../../premiums/providers.dart';
 import '../../../premiums/routes.dart';
 import '../../../premiums/types.dart';
@@ -291,6 +292,16 @@ List<Widget> coreDesktopTabBuilder(
       selectedIcon: Symbols.bookmark,
       icon: Symbols.bookmark,
       title: context.t.sideMenu.your_bookmarks,
+    ),
+    // Same entry point as the mobile side bar menu: opens the feed page as a
+    // route instead of a tab, like the settings / donation tiles below.
+    HomeNavigationTile(
+      value: 99997,
+      constraints: constraints,
+      selectedIcon: Symbols.feed,
+      icon: Symbols.feed,
+      title: context.t.sideMenu.your_feed,
+      onTap: () => goToFeedPage(ref),
     ),
     HomeNavigationTile(
       value: _v(3),

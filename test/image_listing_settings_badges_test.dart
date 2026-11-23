@@ -17,6 +17,8 @@ void main() {
       expect(settings.showResolutionInGrid, isFalse);
       expect(settings.showFileSizeInGrid, isFalse);
       expect(settings.showSourceLogoInGrid, isFalse);
+      expect(settings.showFileFormatInGrid, isFalse);
+      expect(settings.fileInfoBadgePosition, BadgePosition.topRight);
     });
 
     test('new badge flags default to false when absent in stored json', () {
@@ -25,16 +27,21 @@ void main() {
       expect(settings.showResolutionInGrid, isFalse);
       expect(settings.showFileSizeInGrid, isFalse);
       expect(settings.showSourceLogoInGrid, isFalse);
+      expect(settings.showFileFormatInGrid, isFalse);
+      expect(settings.fileInfoBadgePosition, BadgePosition.topRight);
     });
 
     test('new badge flags round-trip through json', () {
-      final json = ImageListingSettings.fromJson(
-        baseJson(),
-      ).copyWith(
-        showResolutionInGrid: true,
-        showFileSizeInGrid: true,
-        showSourceLogoInGrid: true,
-      ).toJson();
+      final json =
+          ImageListingSettings.fromJson(
+                baseJson(),
+              )
+              .copyWith(
+                showResolutionInGrid: true,
+                showFileSizeInGrid: true,
+                showSourceLogoInGrid: true,
+              )
+              .toJson();
 
       expect(json['showResolutionInGrid'], isTrue);
       expect(json['showFileSizeInGrid'], isTrue);
@@ -68,6 +75,56 @@ void main() {
       expect(updated.showResolutionInGrid, isTrue);
       expect(updated.showSourceLogoInGrid, isTrue);
       expect(updated.showFileSizeInGrid, isFalse);
+    });
+
+    test('file format flag round-trips through json', () {
+      final json =
+          ImageListingSettings.fromJson(
+            baseJson(),
+          ).copyWith(showFileFormatInGrid: true).toJson();
+
+      expect(json['showFileFormatInGrid'], isTrue);
+
+      final restored = ImageListingSettings.fromJson(json);
+      expect(restored.showFileFormatInGrid, isTrue);
+    });
+
+    test('badge position round-trips through json', () {
+      final json =
+          ImageListingSettings.fromJson(
+            baseJson(),
+          ).copyWith(
+            fileInfoBadgePosition: BadgePosition.bottomLeft,
+          ).toJson();
+
+      // toData() persists the enum index, like PageIndicatorPosition.
+      expect(json['fileInfoBadgePosition'], 2);
+
+      final restored = ImageListingSettings.fromJson(json);
+      expect(restored.fileInfoBadgePosition, BadgePosition.bottomLeft);
+    });
+
+    test('badge position parse accepts names, indices and junk', () {
+      expect(BadgePosition.parse('topLeft'), BadgePosition.topLeft);
+      expect(BadgePosition.parse('bottomRight'), BadgePosition.bottomRight);
+      expect(BadgePosition.parse(0), BadgePosition.topLeft);
+      expect(BadgePosition.parse(3), BadgePosition.bottomRight);
+      expect(BadgePosition.parse('nope'), BadgePosition.topRight);
+      expect(BadgePosition.parse(null), BadgePosition.topRight);
+    });
+
+    test('copyWith keeps unspecified format flag and position', () {
+      final settings = ImageListingSettings.fromJson(
+        baseJson()
+          ..['showFileFormatInGrid'] = true
+          ..['fileInfoBadgePosition'] = 3,
+      );
+
+      final updated = settings.copyWith(showResolutionInGrid: true);
+
+      expect(updated.showFileFormatInGrid, isTrue);
+      expect(updated.fileInfoBadgePosition, BadgePosition.bottomRight);
+      expect(updated.showResolutionInGrid, isTrue);
     });
   });
 }

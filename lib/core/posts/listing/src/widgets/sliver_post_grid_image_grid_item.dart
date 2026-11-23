@@ -96,6 +96,18 @@ class SliverPostGridImageGridItem<T extends Post> extends ConsumerWidget {
       ),
     );
 
+    final showFileFormatInGrid = ref.watch(
+      imageListingSettingsProvider.select(
+        (value) => value.showFileFormatInGrid,
+      ),
+    );
+
+    final fileInfoBadgePosition = ref.watch(
+      imageListingSettingsProvider.select(
+        (value) => value.fileInfoBadgePosition,
+      ),
+    );
+
     final scoreWidget = showScoresInGrid
         ? score.toOption().fold(
             () => null,
@@ -104,12 +116,17 @@ class SliverPostGridImageGridItem<T extends Post> extends ConsumerWidget {
         : null;
 
     final fileInfoBadges =
-        showResolutionInGrid || showFileSizeInGrid || showSourceLogoInGrid
+        showResolutionInGrid ||
+            showFileSizeInGrid ||
+            showSourceLogoInGrid ||
+            showFileFormatInGrid
         ? PostGridFileInfoBadges(
             post: post,
             showSourceLogo: showSourceLogoInGrid,
             showResolution: showResolutionInGrid,
             showFileSize: showFileSizeInGrid,
+            showFileFormat: showFileFormatInGrid,
+            position: fileInfoBadgePosition,
             // hide the text badges on tiny tiles where they would not fit;
             // the source favicon stays
             compact: gridSize == GridSize.tiny || gridSize == GridSize.micro,
@@ -165,8 +182,10 @@ class SliverPostGridImageGridItem<T extends Post> extends ConsumerWidget {
           ),
           if (fileInfoBadges != null)
             Positioned(
-              top: 1,
-              right: 1,
+              top: fileInfoBadgePosition.isTop ? 1 : null,
+              bottom: fileInfoBadgePosition.isTop ? null : 1,
+              left: fileInfoBadgePosition.isLeft ? 1 : null,
+              right: fileInfoBadgePosition.isLeft ? null : 1,
               child: fileInfoBadges,
             ),
           if (overlay != null) ...[

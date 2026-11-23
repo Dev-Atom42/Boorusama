@@ -174,6 +174,20 @@ class _ImageListingSettingsSectionState
               _onUpdate(settings.copyWith(showSourceLogoInGrid: value)),
         ),
         KurumiSwitchListTile(
+          title: Text(context.t.settings.appearance.show_file_format),
+          value: settings.showFileFormatInGrid,
+          onChanged: (value) =>
+              _onUpdate(settings.copyWith(showFileFormatInGrid: value)),
+        ),
+        KurumiSettingsTile(
+          title: Text(context.t.settings.appearance.badge_position),
+          selectedOption: settings.fileInfoBadgePosition,
+          items: const [...BadgePosition.values],
+          onChanged: (value) =>
+              _onUpdate(settings.copyWith(fileInfoBadgePosition: value)),
+          optionBuilder: (value) => Text(value.localize(context)),
+        ),
+        KurumiSwitchListTile(
           title: Text(
             context.t.settings.appearance.show_post_list_config_header,
           ),

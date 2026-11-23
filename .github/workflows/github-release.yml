@@ -286,13 +286,11 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ github.ref_name }}"
-          case "$TAG" in
-            v*) ;;
-            *)
-              echo "::error::The release tag is taken from the ref this workflow runs on ('$TAG'). Run the workflow from a v* tag via the branch/tag picker, or enable smoke_run for a build-only run."
-              exit 1
-              ;;
-          esac
+          # The tag is taken from whatever ref the workflow was started on —
+          # a v* tag or any branch (side branches included). A release cut
+          # from a branch can be flipped to a draft in the GitHub UI after
+          # publishing, or created as one up front via the draft input.
+          echo "::notice::Creating release '$TAG' from ref '${{ github.ref }}'."
           args=(
             release
             github

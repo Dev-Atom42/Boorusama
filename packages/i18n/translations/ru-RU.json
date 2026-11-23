@@ -1,4 +1,12 @@
 {
+  "feed": {
+    "title": "Лента",
+    "manage": "Управление подписками",
+    "add_subscription": "Добавить подписку",
+    "query_hint": "Поисковый запрос, например: genshin_impact solo",
+    "empty": "Подпишитесь на поисковые запросы, чтобы видеть новое по ним здесь. Добавьте подписку, чтобы начать.",
+    "last_checked": "Последняя проверка: $time"
+  },
   "generic": {
     "done": "Выполнено",
     "errors": {
@@ -313,6 +321,17 @@
     "appearance": {
       "appearance": "Внешний вид",
       "show_scores": "Показать баллы",
+      "show_resolution": "Показать разрешение",
+      "show_file_size": "Показать размер файла",
+      "show_source_logo": "Показать логотип источника",
+      "show_file_format": "Показать формат файла",
+      "badge_position": "Расположение информационных бейджей",
+      "badge_position_options": {
+        "top_left": "Сверху слева",
+        "top_right": "Сверху справа",
+        "bottom_left": "Снизу слева",
+        "bottom_right": "Снизу справа"
+      },
       "show_post_list_config_header": "Показать заголовок конфигурации сообщений",
       "booru_config": "Профиль Боору",
       "booru_config_placement": "Размещение профиля Booru",
@@ -911,6 +930,7 @@
   "sideMenu": {
     "settings": "Настройки",
     "your_bookmarks": "Ваши закладки",
+    "your_feed": "Ваша лента",
     "your_blacklist": "Ваш чёрный список",
     "bulk_download": "Массовая загрузка",
     "get_support": "Обратиться в поддержку",
